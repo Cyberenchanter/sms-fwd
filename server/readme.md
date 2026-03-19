@@ -22,7 +22,7 @@ Run the setup script on your Linux server:
 
 ```bash
 git clone https://github.com/Cyberenchanter/sms-fwd.git
-sudo bash sms-fwd/setup.sh
+sudo bash sms-fwd/install.sh
 ```
 
 The script will:

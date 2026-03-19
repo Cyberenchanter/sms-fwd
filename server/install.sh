@@ -11,7 +11,6 @@ NC='\033[0m'
 INSTALL_DIR="/opt/sms-fwd"
 SERVICE_NAME="sms-fwd-server"
 REPO_URL="https://github.com/Cyberenchanter/sms-fwd.git"
-CLONE_DIR="/tmp/sms-fwd-build"
 ACME_HOME="/root/.acme.sh"
 CERT_DIR="${INSTALL_DIR}/certs"
 
@@ -24,6 +23,37 @@ err()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 if [[ $EUID -ne 0 ]]; then
     err "This script must be run as root (use sudo)"
 fi
+
+# --- Resolve source directory ---
+resolve_source_dir() {
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Check if main.go exists alongside this script (already cloned)
+    if [[ -f "${SCRIPT_DIR}/main.go" ]]; then
+        SOURCE_DIR="$SCRIPT_DIR"
+        ok "Source found in ${SOURCE_DIR}"
+        return
+    fi
+
+    # Check current working directory
+    if [[ -f "$(pwd)/main.go" ]]; then
+        SOURCE_DIR="$(pwd)"
+        ok "Source found in ${SOURCE_DIR}"
+        return
+    fi
+
+    # Fall back to cloning
+    info "Source not found locally, cloning repository..."
+    CLONE_DIR="/tmp/sms-fwd-build"
+    rm -rf "$CLONE_DIR"
+    git clone "$REPO_URL" "$CLONE_DIR"
+    SOURCE_DIR="${CLONE_DIR}/server"
+
+    if [[ ! -f "${SOURCE_DIR}/main.go" ]]; then
+        err "main.go not found after cloning. Repository structure may have changed."
+    fi
+    ok "Source cloned to ${SOURCE_DIR}"
+}
 
 # --- Detect package manager ---
 detect_pkg_manager() {
@@ -116,14 +146,10 @@ issue_certificate() {
     ok "Auto-renewal is handled by acme.sh cron job"
 }
 
-# --- Clone and build ---
+# --- Build ---
 build_server() {
-    info "Cloning repository..."
-    rm -rf "$CLONE_DIR"
-    git clone "$REPO_URL" "$CLONE_DIR"
-
-    info "Building server..."
-    cd "$CLONE_DIR/server"
+    info "Building server from ${SOURCE_DIR}..."
+    cd "$SOURCE_DIR"
     go build -o sms-fwd-server .
     ok "Build successful"
 }
@@ -204,10 +230,14 @@ install_files() {
     info "Installing to ${INSTALL_DIR}..."
     mkdir -p "$INSTALL_DIR"
 
-    cp "$CLONE_DIR/server/sms-fwd-server" "$INSTALL_DIR/"
+    cp "$SOURCE_DIR/sms-fwd-server" "$INSTALL_DIR/"
     chmod +x "$INSTALL_DIR/sms-fwd-server"
 
     # Generate start.sh from template
+    if [[ ! -f "${SOURCE_DIR}/start.sh.example" ]]; then
+        err "start.sh.example not found in ${SOURCE_DIR}"
+    fi
+
     sed \
         -e "s|^export TELEGRAM_BOT_TOKEN=.*|export TELEGRAM_BOT_TOKEN=\"${CFG_BOT_TOKEN}\"|" \
         -e "s|^export TELEGRAM_CHAT_ID=.*|export TELEGRAM_CHAT_ID=\"${CFG_CHAT_ID}\"|" \
@@ -217,8 +247,8 @@ install_files() {
         -e "s|^export TLS_CERT_FILE=.*|export TLS_CERT_FILE=\"${CFG_TLS_CERT}\"|" \
         -e "s|^export TLS_KEY_FILE=.*|export TLS_KEY_FILE=\"${CFG_TLS_KEY}\"|" \
         -e "s|^exec .*|exec ${INSTALL_DIR}/sms-fwd-server|" \
-        "$CLONE_DIR/server/start.sh.example" > "$INSTALL_DIR/start.sh"
-    
+        "$SOURCE_DIR/start.sh.example" > "$INSTALL_DIR/start.sh"
+
     chmod 600 "$INSTALL_DIR/start.sh"      # protect secrets
     chmod +x "$INSTALL_DIR/start.sh"
 
@@ -271,9 +301,12 @@ EOF
 
 # --- Cleanup ---
 cleanup() {
-    info "Cleaning up build directory..."
-    rm -rf "$CLONE_DIR"
-    ok "Cleanup done"
+    # Only clean up if we cloned to a temp directory
+    if [[ -n "${CLONE_DIR:-}" && -d "${CLONE_DIR:-}" ]]; then
+        info "Cleaning up build directory..."
+        rm -rf "$CLONE_DIR"
+        ok "Cleanup done"
+    fi
 }
 
 # --- Summary ---
@@ -310,6 +343,7 @@ main() {
     echo -e "${CYAN}=== SMS Forward Proxy Server Setup ===${NC}"
     echo ""
 
+    resolve_source_dir
     install_go
     prompt_config
     build_server
