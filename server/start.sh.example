@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --- Configuration (edit these values) ---
+export TELEGRAM_BOT_TOKEN="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+export TELEGRAM_CHAT_ID="123456789"
+export AUTH_TOKEN="change-me-to-a-strong-random-string"
+export LISTEN_ADDR=":10086"
+export API_PATH="/forward"
+export TLS_CERT_FILE="/Users/cyberenchanter/sms-fwd/server/cert.pem"
+export TLS_KEY_FILE="/Users/cyberenchanter/sms-fwd/server/key.pem"
+
+# --- Run ---
+exec /your/path/sms-fwd-server
