@@ -166,9 +166,6 @@ prompt_config() {
     read -rp "Telegram Chat ID (required): " CFG_CHAT_ID
     [[ -z "$CFG_CHAT_ID" ]] && err "Chat ID is required"
 
-    read -rp "Auth Bearer Token (required): " CFG_AUTH_TOKEN
-    [[ -z "$CFG_AUTH_TOKEN" ]] && err "Auth token is required"
-
     read -rp "Listen Address [:10086]: " CFG_LISTEN_ADDR
     CFG_LISTEN_ADDR="${CFG_LISTEN_ADDR:-:10086}"
 
@@ -195,7 +192,6 @@ prompt_config() {
     echo -e "${CYAN}=== Configuration Summary ===${NC}"
     echo "  Bot Token:    ${CFG_BOT_TOKEN:0:10}..."
     echo "  Chat ID:      $CFG_CHAT_ID"
-    echo "  Auth Token:   ${CFG_AUTH_TOKEN:0:6}..."
     echo "  Listen:       $CFG_LISTEN_ADDR"
     echo "  API Path:     $CFG_API_PATH"
     if [[ -n "$CFG_DOMAIN" ]]; then
@@ -241,7 +237,6 @@ install_files() {
     sed \
         -e "s|^export TELEGRAM_BOT_TOKEN=.*|export TELEGRAM_BOT_TOKEN=\"${CFG_BOT_TOKEN}\"|" \
         -e "s|^export TELEGRAM_CHAT_ID=.*|export TELEGRAM_CHAT_ID=\"${CFG_CHAT_ID}\"|" \
-        -e "s|^export AUTH_TOKEN=.*|export AUTH_TOKEN=\"${CFG_AUTH_TOKEN}\"|" \
         -e "s|^export LISTEN_ADDR=.*|export LISTEN_ADDR=\"${CFG_LISTEN_ADDR}\"|" \
         -e "s|^export API_PATH=.*|export API_PATH=\"${CFG_API_PATH}\"|" \
         -e "s|^export TLS_CERT_FILE=.*|export TLS_CERT_FILE=\"${CFG_TLS_CERT}\"|" \
