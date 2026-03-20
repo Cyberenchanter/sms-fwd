@@ -66,27 +66,46 @@ detect_pkg_manager() {
     fi
 }
 
+
+GO_VERSION="1.23.6"
+
 # --- Install Go ---
 install_go() {
     if command -v go &>/dev/null; then
-        ok "Go is already installed: $(go version)"
-        return
+        local current_version
+        current_version=$(go version | grep -oP 'go\K[0-9]+\.[0-9]+')
+        if [[ "$(printf '%s\n' "1.22" "$current_version" | sort -V | head -n1)" == "1.22" ]]; then
+            ok "Go is already installed: $(go version)"
+            return
+        else
+            warn "Go ${current_version} is too old, need 1.22+. Installing newer version..."
+        fi
     fi
 
     local pkg_manager
     pkg_manager=$(detect_pkg_manager)
 
-    info "Installing Go via ${pkg_manager}..."
     case "$pkg_manager" in
         apt)
+            info "Installing Go ${GO_VERSION} from official tarball..."
             apt update -y
-            apt install -y golang-go git curl socat
+            apt install -y git curl socat wget
+            wget -q "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -O /tmp/go.tar.gz
+            rm -rf /usr/local/go
+            tar -C /usr/local -xzf /tmp/go.tar.gz
+            rm -f /tmp/go.tar.gz
+            export PATH="/usr/local/go/bin:$PATH"
+            # Persist for future sessions
+            if ! grep -q '/usr/local/go/bin' /etc/profile.d/go.sh 2>/dev/null; then
+                echo 'export PATH=/usr/local/go/bin:$PATH' > /etc/profile.d/go.sh
+            fi
             ;;
         pacman)
+            info "Installing Go via pacman..."
             pacman -Sy --noconfirm go git curl socat
             ;;
         *)
-            err "Unsupported package manager. Install Go manually and re-run this script."
+            err "Unsupported package manager. Install Go 1.22+ manually and re-run this script."
             ;;
     esac
 
